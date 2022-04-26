@@ -41,11 +41,13 @@ app.UseEndpoints(endpoints =>
 
 using (var db = new DatabaseContext())
 {
-    if (db.Configuration.FirstOrDefault(x => x.Id == 1) == null)
+    if (db.Configuration.Count() == 0)
     {
         db.Configuration.Add(new ProxyChecker.Database.Models.Config
         {
-            Id = 1,
+            FlareSolverrUrl = "",
+            AdminUsername = "",
+            AdminPassword = "",
         });
     }
 }

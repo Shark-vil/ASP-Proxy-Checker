@@ -1,0 +1,17 @@
+﻿@model ProxyChecker.Core.Models.Views.ViewConfigModel
+
+<div class="text-center">
+    <h1 class="display-4">Конфигурация</h1>
+    <div class="d-flex justify-content-center row">
+        <form href="#" method="POST" style="width: 80vh">
+            <div class="form-group"> 
+                <label class="form-label">Адрес API FlareSolverr для пробития CloudFlare</label>
+                <input name="FlareSolverrUrl" value="@Model.FlareSolverrUrl" class="form-control" autocomplete="off"/>
+            </div>
+
+            <br/>
+
+            <button type="submit" class="btn btn-primary">Отправить</button>
+        </form>
+    </div>
+</div>

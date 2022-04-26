@@ -60,6 +60,11 @@ namespace ProxyChecker.Controllers.API
         private static string _apiUrl = "https://ipqualityscore.com/api/json/ip/";
 
         /// <summary>
+        /// Адрес для обращения к API FlareSolverr для обхода CloudFlare (Устанавливается динамически)
+        /// </summary>
+        private static string _flareSolverrUrl = String.Empty;
+
+        /// <summary>
         /// Параметры запроса при обращении к APO сканера прокси
         /// </summary>
         private static Dictionary<string, string> _apiGetOptions = new Dictionary<string, string>()
@@ -84,13 +89,18 @@ namespace ProxyChecker.Controllers.API
         [HttpPost("Api/[controller]/Stop")]
         public IActionResult Stop()
         {
+            Task.Run(async () => await StopProcess());
+
+            return Ok();
+        }
+
+        private async Task StopProcess()
+        {
             _flareSolverrProxies.Clear();
             _proxiesCheckedQueue.Clear();
             _currentCheckIdentifier = string.Empty;
 
-            Task.Run(async () => await StopBrowsers());
-
-            return Ok();
+            await StopBrowsers();
         }
 
         /// <summary>
@@ -174,10 +184,24 @@ namespace ProxyChecker.Controllers.API
             var flareSolverrProxies = new Queue<DbFlareSolverrProxy>();
             var flareSolverrProxiesBlocked = new List<DbFlareSolverrProxy>();
             DbFlareSolverrProxy currentFlareSolverrProxy = null;
-            var random = new Random();
+            Random randomTimeout = new Random();
+            string webUrlPattern = @"^(ht|f)tp(s?)\:\/\/[0-9a-zA-Z]([-.\w]*[0-9a-zA-Z])*(:(0-9)*)*(\/?)([a-zA-Z0-9\-\.\?\,\'\/\\\+&%\$#_]*)?$";
 
             using (var db = new DatabaseContext())
+            {
                 Console.WriteLine($"Число обходных прокси: {db.FlareSolverrProxies.Count()}");
+
+                Config? config = db.Configuration.FirstOrDefault();
+                if (config != null)
+                    _flareSolverrUrl = config.FlareSolverrUrl;
+            }
+
+            if (string.IsNullOrEmpty(_flareSolverrUrl) || !Regex.IsMatch(_flareSolverrUrl, webUrlPattern))
+            {
+                Console.WriteLine($"Адрес FlareSolverr не установлен или задан некорректно, процесс прерван!");
+                await StopProcess();
+                return;
+            }
 
             using (var httpClient = new HttpClient())
             {
@@ -218,13 +242,13 @@ namespace ProxyChecker.Controllers.API
 
                         HttpResponseMessage httpResponse = await httpClient.SendAsync(new HttpRequestMessage
                         {
-                            RequestUri = new Uri("http://194.67.78.16:8191/v1/"),
+                            RequestUri = new Uri(_flareSolverrUrl),
                             Method = new HttpMethod("POST"),
                             Content = new StringContent(JsonConvert.SerializeObject(new FlareSolverrRequestGet
                             {
                                 url = "https://www.ipqualityscore.com/",
                                 session = _sessionName,
-                                maxTimeout = (uint)random.Next(5000, (int)timeLimit),
+                                maxTimeout = (uint)randomTimeout.Next(5000, (int)timeLimit),
                                 proxy = flareSolverrProxy
                             }), Encoding.UTF8, "application/json")
                         });
@@ -293,7 +317,7 @@ namespace ProxyChecker.Controllers.API
 
                     await httpClient.SendAsync(new HttpRequestMessage
                     {
-                        RequestUri = new Uri("http://194.67.78.16:8191/v1/"),
+                        RequestUri = new Uri(_flareSolverrUrl),
                         Method = new HttpMethod("POST"),
                         Content = new StringContent(JsonConvert.SerializeObject(new FlareSolverrRequestDestroy
                         {
@@ -322,7 +346,7 @@ namespace ProxyChecker.Controllers.API
 
                     await httpClient.SendAsync(new HttpRequestMessage
                     {
-                        RequestUri = new Uri("http://194.67.78.16:8191/v1/"),
+                        RequestUri = new Uri(_flareSolverrUrl),
                         Method = new HttpMethod("POST"),
                         Content = new StringContent(JsonConvert.SerializeObject(new FlareSolverrRequestCreate
                         {
@@ -411,7 +435,7 @@ namespace ProxyChecker.Controllers.API
 
                         httpResponse = await httpClient.SendAsync(new HttpRequestMessage
                         {
-                            RequestUri = new Uri("http://194.67.78.16:8191/v1/"),
+                            RequestUri = new Uri(_flareSolverrUrl),
                             Method = new HttpMethod("POST"),
                             Content = new StringContent(JsonConvert.SerializeObject(new FlareSolverrRequestGet
                             {
