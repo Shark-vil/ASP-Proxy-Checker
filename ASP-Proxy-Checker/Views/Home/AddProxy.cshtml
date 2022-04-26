@@ -1,0 +1,117 @@
+﻿<div class="text-center">
+    <h3 class="display-4">Добавление прокси в базу</h3>
+
+    <h3>Данные подключения к прокси (с новой строки):</h3>
+    <p>Формат: <span style="font-weight:bold">логин:пароль@ip:port</span></p>
+    <div class="d-flex justify-content-center">
+        <form id="proxyDataForm" style="width: 800px;">
+            <div class="form-group">
+                <textarea class="form-control" rows="8" name="proxies" autocomplete="off"></textarea>
+            </div>
+
+            </br>
+
+            <input class="btn btn-primary" type="submit" value="Отправить" />
+        </form>
+    </div>
+
+     <br/>
+
+    <h3>Список определённых адресов:</h3>
+    <div class="d-flex justify-content-center">
+        <textarea id="content" class="form-control" style="width: 800px;" rows="15" readonly></textarea>
+    </div>
+</div>
+
+@section Scripts {
+
+<script type="text/javascript">
+    let form = $("#proxyDataForm");
+    let content = $('#content');
+    let updateIdentifier;
+
+    function AddProxyListInfo() {
+        if (!updateIdentifier) return;
+
+        $.ajax({
+            type: "GET",
+            url: "/Api/BackConnectProxy/AddProxyListInfo/" + updateIdentifier,
+            success: function (proxiesStringArray, textStatus, xhr) {
+                if (xhr.status == 200) {
+                    let newContent = "";
+
+                    proxiesStringArray.forEach((value) => {
+                        newContent = newContent + value + "\n";
+                    });
+
+                    content.val(newContent);
+
+                    setTimeout(() => AddProxyListInfo(), 2000);
+                }
+            },
+        });
+    }
+
+    form.submit(function (e) {
+        e.preventDefault();
+
+        content.val("");
+
+        let formValues = {};
+        
+        $.each(form.serializeArray(), function(i, field) {
+            formValues[field.name] = field.value;
+        });
+
+        let proxiesStringData = formValues["proxies"];
+
+        if (proxiesStringData) {
+
+            let proxiesStringArray = proxiesStringData.split("\n");
+
+            if (proxiesStringArray && proxiesStringArray.length != 0) {
+
+                let sendDataList = [];
+
+                proxiesStringArray.forEach((getValue) => {
+                    let value = getValue.trim();
+                    if (!value) return;
+
+                    let splitProxyData = value.split("@@");
+                    let splitUserData = splitProxyData[0].split(":");
+                    let splitConnectData = splitProxyData[1].split(":");
+                    let sendData = {
+                        "ip" : splitConnectData[0],
+                        "port": splitConnectData[1],
+                        "username": splitUserData[0],
+                        "password": splitUserData[1],
+                    };
+
+                    sendDataList.push(sendData);
+                });
+
+                $.ajax({
+                    type: "POST",
+                    url: "/Api/BackConnectProxy/AddProxyList",
+                    data: {
+                        "data" : JSON.stringify(sendDataList)
+                    },
+                    success: function (identifier, textStatus, xhr) {
+                        if (xhr.status == 200) {
+                            updateIdentifier = identifier;
+                            setTimeout(() => AddProxyListInfo(), 2000);
+                        }
+                    },
+                    failure: function (response) {
+                        console.error("Failure: " + response.responseText);
+                    },
+                    error: function (response) {
+                        console.error("Error: " + response.responseText);
+                    }
+                });
+            }
+        }
+    });
+</script>
+
+}

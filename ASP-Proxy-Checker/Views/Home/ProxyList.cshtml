@@ -1,0 +1,78 @@
+﻿<div class="text-center">
+    <h1 class="display-4">Список прокси</h1>
+
+    <table id="ProxyListTable" class="table table-striped table-bordered table-sm" cellspacing="0" width="100%">
+        <thead>
+            <tr>
+                <th>#</th>
+                <th style="width: 35%">Данные подключения</th>
+                <th>Адрес</th>
+                <th>Тип</th>
+                <th>Действия</th>
+            </tr>
+        </thead>
+        <tbody></tbody>
+        <tfoot>
+            <tr>
+                <th>#</th>
+                <th>Данные подключения</th>
+                <th>Адрес</th>
+                <th>Тип</th>
+                <th>Действия</th>
+            </tr>
+        </tfoot>
+    </table>
+</div>
+
+@section Scripts {
+
+<script type="text/javascript">
+    let proxyListTable = $("#ProxyListTable");
+    let tableBody = $("#ProxyListTable > tbody");
+    let dataTable;
+
+    function LoadingTable() {
+        dataTable = proxyListTable.DataTable({
+            columns: [
+                { data: "id" },
+                {
+                    data: "auth",
+                    render: function (data, type, entry, meta) {
+                        return entry.username + ":" + entry.password + "@@" + entry.ip + ":" + entry.port;
+                    }
+                },
+                { data: "realAddress" },
+                { data: "proxyType" },
+                {
+                    data: "action",
+                    render: function (data, type, entry, meta) {
+                        return "<button type=\"button\" class=\"btn btn-danger\" onclick=\"AddToBlackList(this, '" + entry.realAddress + "')\">Добавить а ЧС</button>";
+                    }
+                }
+            ],
+            ajax: {
+                url: "/Api/Db/Proxy",
+                dataSrc: ""
+            }
+        });
+    }
+
+    function AddToBlackList(button, address) {
+        $.ajax({
+            type: "POST",
+            url: "/Api/Db/BlockedProxy",
+            data: {
+                "address": address,
+            },
+            success: function (response, textStatus, xhr) {
+                if (xhr.status == 200) {
+                    dataTable.ajax.reload();
+                }
+            },
+        });
+    }
+
+    $(LoadingTable);
+</script>
+
+}
