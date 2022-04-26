@@ -1,5 +1,8 @@
 ﻿namespace ProxyChecker.Core.Models
 {
+    /// <summary>
+    /// Модель используется в "BackConnectProxyController"
+    /// </summary>
     public class BackConnectProxyModel
     {
         public string ip;

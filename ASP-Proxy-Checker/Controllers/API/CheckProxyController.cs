@@ -6,15 +6,20 @@ using ProxyChecker.Core.Models;
 using ProxyChecker.Core.Models.FlareSolverr;
 using ProxyChecker.Database;
 using ProxyChecker.Database.Models;
-using System.Net.Http.Headers;
 using System.Text;
 using System.Text.RegularExpressions;
 using DbFlareSolverrProxy = ProxyChecker.Database.Models.FlareSolverrProxy;
 
 namespace ProxyChecker.Controllers.API
 {
+    /// <summary>
+    /// Контроллер для сканирования прокси
+    /// </summary>
     public class CheckProxyController : Controller
     {
+        /// <summary>
+        /// Исключение для вызова в случае превышения количества обращений к серверу через парсинг
+        /// </summary>
         private class MaxLookupsException : Exception
         {
             public MaxLookupsException() { }
@@ -24,17 +29,41 @@ namespace ProxyChecker.Controllers.API
             public MaxLookupsException(string message, Exception inner) : base(message, inner) { }
         }
 
-        private static List<Proxy> _validProxies = new List<Proxy>();
+        /// <summary>
+        /// Очередь прокси для сканирования 
+        /// </summary>
         private static Queue<Proxy> _proxiesCheckedQueue = new Queue<Proxy>();
-        private static Queue<DbFlareSolverrProxy> _flareSolverrProxies = new Queue<DbFlareSolverrProxy>();
-        private static DbFlareSolverrProxy _currentFlareSolverrProxy = null;
+
+        /// <summary>
+        /// Общее число элементов в очереди прокси для сканирования
+        /// </summary>
         private static int _proxiesCheckedTotal = 0;
-        private static string _checkType = string.Empty;
-        private static uint _threadCount = 1;
+
+        /// <summary>
+        /// Очередь прокси для обхода в случае превышения числа запросов при парсинге
+        /// </summary>
+        private static Queue<DbFlareSolverrProxy> _flareSolverrProxies = new Queue<DbFlareSolverrProxy>();
+
+        /// <summary>
+        /// Текущий прокси для обхода при привышении числа запросов
+        /// </summary>
+        private static DbFlareSolverrProxy _currentFlareSolverrProxy = null;
+
+        /// <summary>
+        /// Текущий идентификатор активного процесса
+        /// </summary>
         private static string _currentCheckIdentifier = string.Empty;
+
+        /// <summary>
+        /// Адрес для обращения к API сканера прокси
+        /// </summary>
         private static string _apiUrl = "https://ipqualityscore.com/api/json/ip/";
-        private static string _sessionName = "proxychecker";
-        private static Dictionary<string, string> _apiGetOptions = new Dictionary<string, string>() {
+
+        /// <summary>
+        /// Параметры запроса при обращении к APO сканера прокси
+        /// </summary>
+        private static Dictionary<string, string> _apiGetOptions = new Dictionary<string, string>()
+        {
             ["strictness"] = "1",
             ["allow_public_access_points"] = "false",
             ["fast"] = "false",
@@ -42,6 +71,16 @@ namespace ProxyChecker.Controllers.API
             ["mobile"] = "true",
         };
 
+        /// <summary>
+        /// Название сесии для <see href="https://github.com/FlareSolverr/FlareSolverr">FlareSolverr</see> по умолчанию
+        /// </summary>
+        private static string _sessionName = "proxychecker";
+
+
+        /// <summary>
+        /// Останавливает активный в данный момент процесс сканирования
+        /// </summary>
+        /// <returns>IActionResult</returns>
         [HttpPost("Api/[controller]/Stop")]
         public IActionResult Stop()
         {
@@ -54,6 +93,12 @@ namespace ProxyChecker.Controllers.API
             return Ok();
         }
 
+        /// <summary>
+        /// Запускает новый процесс сканирования
+        /// </summary>
+        /// <param name="checkType">Тип сканера</param>
+        /// <param name="threadCount">Число потоков</param>
+        /// <returns></returns>
         [HttpPost("Api/[controller]/Start")]
         public IActionResult Start([FromForm] string checkType, [FromForm] uint threadCount)
         {
@@ -62,11 +107,8 @@ namespace ProxyChecker.Controllers.API
 
             _flareSolverrProxies.Clear();
             _proxiesCheckedQueue.Clear();
-            _validProxies.Clear();
 
             _currentCheckIdentifier = Guid.NewGuid().ToString();
-            _threadCount = threadCount;
-            _checkType = checkType;
 
             using (var db = new DatabaseContext())
             {
@@ -103,7 +145,7 @@ namespace ProxyChecker.Controllers.API
                     multiThread = new MultiThread(CheckByApi);
                 else
                 {
-                    multiThread = new MultiThread(CheckByProxy);
+                    multiThread = new MultiThread(CheckByParse);
 
                     await RebuildBrowsers();
                     await CloudFlareBypass();
@@ -111,7 +153,7 @@ namespace ProxyChecker.Controllers.API
 
                 if (_proxiesCheckedQueue.Count > 0)
                 {
-                    multiThread.SetLimit(_threadCount);
+                    multiThread.SetLimit(threadCount);
                     multiThread.Start();
                 }
             });
@@ -119,6 +161,12 @@ namespace ProxyChecker.Controllers.API
             return Ok();
         }
 
+        /// <summary>
+        /// Задача, выполняемая перед запуском сканирования с использованием парсинга.
+        /// <br></br>
+        /// Потоки не будут запущены до тех пор, пока система не пробётся через блокировщик.
+        /// </summary>
+        /// <returns>Task</returns>
         private async Task CloudFlareBypass()
         {
             bool isBypass = false;
@@ -231,6 +279,10 @@ namespace ProxyChecker.Controllers.API
             }
         }
 
+        /// <summary>
+        /// Останавливает активный браузер <see href="https://github.com/FlareSolverr/FlareSolverr">FlareSolverr</see>.
+        /// </summary>
+        /// <returns>Task</returns>
         private async Task StopBrowsers()
         {
             using (var httpClient = new HttpClient())
@@ -256,6 +308,10 @@ namespace ProxyChecker.Controllers.API
             }
         }
 
+        /// <summary>
+        /// Запускает новый браузер <see href="https://github.com/FlareSolverr/FlareSolverr">FlareSolverr</see>.
+        /// </summary>
+        /// <returns>Task</returns>
         private async Task StartBrowsers()
         {
             using (var httpClient = new HttpClient())
@@ -281,13 +337,24 @@ namespace ProxyChecker.Controllers.API
             }
         }
 
+        /// <summary>
+        /// Перезапускает браузер <see href="https://github.com/FlareSolverr/FlareSolverr">FlareSolverr</see>.
+        /// </summary>
+        /// <returns>Task</returns>
         private async Task RebuildBrowsers()
         {
             await StopBrowsers();
             await StartBrowsers();
         }
 
-        private async Task CheckByProxy(object locker, int threadIndex)
+        /// <summary>
+        /// Процесс проверки прокси через метод парсинга.
+        /// </summary>
+        /// <param name="locker">Объект для синхронизации потоков</param>
+        /// <param name="threadIndex">ID текущего потока</param>
+        /// <returns>Task</returns>
+        /// <exception cref="MaxLookupsException">Исключение в случае превышения числа обращений к сайту</exception>
+        private async Task CheckByParse(object locker, int threadIndex)
         {
             string checkIdentifier = _currentCheckIdentifier;
 
@@ -466,8 +533,6 @@ namespace ProxyChecker.Controllers.API
                             await db.IPQualityScoreChecks.AddAsync(iPQuality);
                             await db.SaveChangesAsync();
                         }
-
-                        _validProxies.Add(proxy);
                     }
                 }
                 catch (MaxLookupsException ex) when (_flareSolverrProxies.Count > 0)
@@ -500,6 +565,12 @@ namespace ProxyChecker.Controllers.API
                 await StopBrowsers();
         }
 
+        /// <summary>
+        /// Процесс проверки прокси через метод обращения к API сканера.
+        /// </summary>
+        /// <param name="locker">Объект для синхронизации потоков</param>
+        /// <param name="threadIndex">ID текущего потока</param>
+        /// <returns>Task</returns>
         private async Task CheckByApi(object locker, int threadIndex)
         {
             string checkIdentifier = _currentCheckIdentifier;
@@ -563,8 +634,6 @@ namespace ProxyChecker.Controllers.API
                         await db.IPQualityScoreChecks.AddAsync(iPQuality);
                         await db.SaveChangesAsync();
                     }
-
-                    _validProxies.Add(proxy);
                 }
                 catch (Exception ex)
                 {
@@ -588,6 +657,11 @@ namespace ProxyChecker.Controllers.API
                 await StopBrowsers();
         }
 
+        /// <summary>
+        /// Возвращает значение из HTML объекта.
+        /// </summary>
+        /// <param name="htmlNode">HTML объект</param>
+        /// <returns>Строка между тегов</returns>
         private string HtmlNodeGetValue(HtmlNode htmlNode)
         {
             string value = htmlNode.InnerText;
@@ -596,6 +670,12 @@ namespace ProxyChecker.Controllers.API
             return value;
         }
 
+        /// <summary>
+        /// Возвращает ссылку для сканирования IP через API сканера с использованием токена
+        /// </summary>
+        /// <param name="ip">IP для сканирования</param>
+        /// <param name="token">Токен для обращения к API</param>
+        /// <returns>Конечная ссылка</returns>
         private Uri GetApiCheckerLink(string ip, string token)
         {
             string url = _apiUrl;
@@ -611,13 +691,21 @@ namespace ProxyChecker.Controllers.API
             return new Uri(url);
         }
 
+        /// <summary>
+        /// Возвращает ссылку для сканирования IP методом парсинга
+        /// </summary>
+        /// <param name="ip">IP для сканирования</param>
+        /// <returns>Конечная ссылка</returns>
         private Uri GetProxyCheckerLink(string ip)
         {
             string url = $"https://www.ipqualityscore.com/free-ip-lookup-proxy-vpn-test/lookup/{ip}";
             return new Uri(url);
         }
 
-
+        /// <summary>
+        /// Возвращает клиенту процент выполнения сканирования.
+        /// </summary>
+        /// <returns>Вернёт 100 если процесс завершён, или в очереди нету прокси</returns>
         [HttpGet("Api/[controller]/CheckProcess")]
         public IActionResult CheckProcess()
         {
@@ -629,6 +717,10 @@ namespace ProxyChecker.Controllers.API
             return Ok(percent);
         }
 
+        /// <summary>
+        /// Возвращает клиенту список с результатами сканирования за последний момент.
+        /// </summary>
+        /// <returns>Список с последними результатами сканирования из базы данных</returns>
         [HttpGet("Api/[controller]")]
         public IEnumerable<IPQualityScore> Get()
         {

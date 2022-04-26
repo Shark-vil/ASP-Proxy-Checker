@@ -3,6 +3,9 @@ using ProxyChecker.Database.Models;
 
 namespace ProxyChecker.Database
 {
+    /// <summary>
+    /// Контекст базы данных
+    /// </summary>
     public class DatabaseContext : DbContext
     {
         public DbSet<User> Users { get; set; }
@@ -18,21 +21,6 @@ namespace ProxyChecker.Database
             //Database.EnsureDeleted();
             Database.EnsureCreated();
         }
-
-        /*
-        protected override void OnModelCreating(ModelBuilder modelBuilder)
-        {
-            //modelBuilder.Entity<Proxy>().HasKey(u => u.Id);
-
-            modelBuilder.Entity<Config>().HasData(new Config
-            {
-                Id = 1,
-                FlareSolverrUrl = "",
-                AdminPassword = "",
-                AdminUsername = ""
-            });
-        }
-        */
 
         protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
         {

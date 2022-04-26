@@ -3,6 +3,9 @@ using System.ComponentModel.DataAnnotations;
 
 namespace ProxyChecker.Database.Models
 {
+    /// <summary>
+    /// Результаты сканирования прокси
+    /// </summary>
     public class IPQualityScore
     {
         [Key]

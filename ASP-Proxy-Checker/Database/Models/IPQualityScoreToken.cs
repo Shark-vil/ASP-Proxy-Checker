@@ -2,6 +2,9 @@
 
 namespace ProxyChecker.Database.Models
 {
+    /// <summary>
+    /// Токен для обмена с API сканера прокси
+    /// </summary>
     public class IPQualityScoreToken
     {
         [Key]

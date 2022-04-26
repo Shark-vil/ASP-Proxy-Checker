@@ -5,47 +5,70 @@ using ProxyChecker.Database;
 
 namespace ProxyChecker.Controllers.API
 {
-    //[Route("api/[controller]")]
-    //[ApiController]
+    /// <summary>
+    /// Контроллер для обработки добавления прокси
+    /// </summary>
     public class BackConnectProxyController : Controller
     {
-        private static Dictionary<string, List<string>> _newProxyRegistred = new Dictionary<string, List<string>>();
-        private const int _temporaryProxyRegistredTimeMinutes = 2;
+        /// <summary>
+        /// Схранит в себе список с информацией о результате работы конкретного процесса
+        /// </summary>
+        private static Dictionary<string, List<string>> _informationResponse = new Dictionary<string, List<string>>();
 
+        /// <summary>
+        /// Сколько времени в минутах нужно хранить результаты после последней проверки
+        /// </summary>
+        private const int _temporaryInformationResponse = 2;
+
+        /// <summary>
+        /// Добавляет текст в результаты вывода информации о процесса
+        /// </summary>
+        /// <param name="identifier">Идентификатор процесса</param>
+        /// <param name="text">Строка с текстом</param>
         private void AddToLog(string identifier, string text)
         {
-            if (_newProxyRegistred.ContainsKey(identifier))
-                _newProxyRegistred[identifier].Add(text);
+            if (_informationResponse.ContainsKey(identifier))
+                _informationResponse[identifier].Add(text);
 
             Console.WriteLine(text);
         }
 
+        /// <summary>
+        /// Выводит информацию со списком результата работы процесса.
+        /// </summary>
+        /// <param name="identifier">Идентификатор процесса</param>
+        /// <returns>IActionResult</returns>
         [HttpGet("Api/[controller]/AddProxyListInfo/{identifier}")]
         public IActionResult AddProxyListInfo(string identifier)
         {
-            if (!_newProxyRegistred.ContainsKey(identifier))
+            if (!_informationResponse.ContainsKey(identifier))
                 return StatusCode(404);
 
-            return Ok(_newProxyRegistred[identifier].ToArray());
+            return Ok(_informationResponse[identifier].ToArray());
         }
 
+        /// <summary>
+        /// Создаёт процесс и добавляет полученные прокси в обработчик. Пользователю выводится ID процесса.
+        /// </summary>
+        /// <param name="data">Список прокси для добавления</param>
+        /// <returns>IActionResult</returns>
         [HttpPost("Api/[controller]/AddProxyList")]
         public IActionResult AddProxyList(string data)
         {
             var backConnects = Newtonsoft.Json.JsonConvert.DeserializeObject<BackConnectProxyModel[]>(data);
             if (backConnects == null) return StatusCode(400);
 
-            DateTime temporaryDataDeletionTime = DateTime.UtcNow.AddMinutes(_temporaryProxyRegistredTimeMinutes);
+            DateTime temporaryDataDeletionTime = DateTime.UtcNow.AddMinutes(_temporaryInformationResponse);
             string identifier = Guid.NewGuid().ToString();
-            _newProxyRegistred[identifier] = new List<string>();
+            _informationResponse[identifier] = new List<string>();
 
             Task.Run(async () =>
             {
                 while (temporaryDataDeletionTime > DateTime.UtcNow)
                     await Task.Delay(TimeSpan.FromSeconds(1));
 
-                if (_newProxyRegistred.ContainsKey(identifier))
-                    _newProxyRegistred.Remove(identifier);
+                if (_informationResponse.ContainsKey(identifier))
+                    _informationResponse.Remove(identifier);
             });
 
             for (int index = 0; index < backConnects.Length; index++)
@@ -61,11 +84,10 @@ namespace ProxyChecker.Controllers.API
                             backConnect.ip,
                             backConnect.port,
                             backConnect.username,
-                            backConnect.password,
-                            backConnects.Length
+                            backConnect.password
                          );
 
-                        temporaryDataDeletionTime = DateTime.UtcNow.AddMinutes(_temporaryProxyRegistredTimeMinutes);
+                        temporaryDataDeletionTime = DateTime.UtcNow.AddMinutes(_temporaryInformationResponse);
                     }
                     catch (Exception ex)
                     {
@@ -77,7 +99,16 @@ namespace ProxyChecker.Controllers.API
             return StatusCode(200, identifier);
         }
 
-        private async Task CheckProxy(string identifier, string ip, uint port, string username, string password, int totalChecks)
+        /// <summary>
+        /// Проверяет прокси и добавляет его в базу данных в случае успеха.
+        /// </summary>
+        /// <param name="identifier">Идентификатор процесса</param>
+        /// <param name="ip">IP адрес прокси</param>
+        /// <param name="port">Порт прокси</param>
+        /// <param name="username">Имя пользователя</param>
+        /// <param name="password">Пароль пользователя</param>
+        /// <returns>Task</returns>
+        private async Task CheckProxy(string identifier, string ip, uint port, string username, string password)
         {
             if (string.IsNullOrEmpty(ip) || port <= 0) return;
 

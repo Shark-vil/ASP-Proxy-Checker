@@ -2,6 +2,9 @@
 
 namespace ProxyChecker.Database.Models
 {
+    /// <summary>
+    /// Модель пользовательских прокси для обхода CloudFlare
+    /// </summary>
     public class FlareSolverrProxy
     {
         [Key]

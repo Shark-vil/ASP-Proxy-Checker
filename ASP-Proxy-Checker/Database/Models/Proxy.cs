@@ -2,6 +2,9 @@
 
 namespace ProxyChecker.Database.Models
 {
+    /// <summary>
+    /// Модель записи пользовательских прокси
+    /// </summary>
     public class Proxy
     {
         [Key]

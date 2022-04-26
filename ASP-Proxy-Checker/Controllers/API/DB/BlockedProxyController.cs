@@ -4,6 +4,9 @@ using ProxyChecker.Database.Models;
 
 namespace ProxyChecker.Controllers.API.DB
 {
+    /// <summary>
+    /// REST API для управления заблокированными прокси
+    /// </summary>
     [Route("api/db/[controller]")]
     [ApiController]
     public class BlockedProxyController : ControllerBase

@@ -6,6 +6,9 @@ using ProxyChecker.Database.Models;
 
 namespace ProxyChecker.Controllers.API.DB
 {
+    /// <summary>
+    /// REST API для управления API токенами сканера
+    /// </summary>
     [Route("api/db/[controller]")]
     [ApiController]
     public class IPQualityScoreTokenController : ControllerBase

@@ -3,8 +3,15 @@ using ProxyChecker.Database.Models;
 
 namespace ProxyChecker.Core
 {
+    /// <summary>
+    /// Класс для настройки конфигурации сервера
+    /// </summary>
     public class Configuration
     {
+        /// <summary>
+        /// Получить конфигурацию сервера.
+        /// </summary>
+        /// <returns>Модель "Config"</returns>
         public static Config GetConfig()
         {
             Config config;
@@ -15,6 +22,10 @@ namespace ProxyChecker.Core
             return config;
         }
 
+        /// <summary>
+        /// Устанавливает адрес для обработки запросов к CloudFlare.
+        /// </summary>
+        /// <param name="flareSolverrUrl">Строка с URL адресом</param>
         public static void SetFlareSolverrUrl(string flareSolverrUrl)
         {
             using (var db = new DatabaseContext())
@@ -25,6 +36,10 @@ namespace ProxyChecker.Core
             }
         }
 
+        /// <summary>
+        /// Устанавливает имя пользователя панели.
+        /// </summary>
+        /// <param name="adminUsername">Имя пользователя</param>
         public static void SetAdminUsername(string adminUsername)
         {
             using (var db = new DatabaseContext())
@@ -35,6 +50,10 @@ namespace ProxyChecker.Core
             }
         }
 
+        /// <summary>
+        /// Устанавливает пароль пользователя панели.
+        /// </summary>
+        /// <param name="adminPassword">Пароль пользователя</param>
         public static void SetAdminPassword(string adminPassword)
         {
             using (var db = new DatabaseContext())

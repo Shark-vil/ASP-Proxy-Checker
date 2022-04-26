@@ -4,16 +4,33 @@ using System.Data;
 
 namespace ProxyChecker.Core
 {
+    /// <summary>
+    /// Сервис для проверки и обновления прокси при старте и через каждые 10 минут
+    /// </summary>
     public class UpdateProxyChecker
     {
+        /// <summary>
+        /// Адрес сайта для получения фактического IP прокси
+        /// </summary>
         private static Uri _seeIpUri = new Uri("https://ip4.seeip.org");
+
+        /// <summary>
+        /// Очередь прокси на обновление
+        /// </summary>
         private static Queue<Proxy> _proxiesQueueUpdate = new Queue<Proxy>();
 
+        /// <summary>
+        /// Запустить сервис
+        /// </summary>
         public static void Run()
         {
             Task.Run(async () => await RunAsync());
         }
 
+        /// <summary>
+        /// Запустить сервис асинхроннл
+        /// </summary>
+        /// <returns>Task</returns>
         private static async Task RunAsync()
         {
             while (true)
@@ -70,6 +87,12 @@ namespace ProxyChecker.Core
             }
         }
 
+        /// <summary>
+        /// Обновить все фактические адреса прокси
+        /// </summary>
+        /// <param name="locker">Объект для синхронизации потоков</param>
+        /// <param name="threadIndex">Индекс текущего потока</param>
+        /// <returns>Task</returns>
         private static async Task UpdateEveryone(object locker, int threadIndex)
         {
             while (_proxiesQueueUpdate.Count > 0)

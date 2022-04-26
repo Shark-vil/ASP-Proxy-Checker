@@ -2,6 +2,9 @@
 
 namespace ProxyChecker.Database.Models
 {
+    /// <summary>
+    /// Заблокированный прокси
+    /// </summary>
     public class BlockedProxy
     {
         [Key]

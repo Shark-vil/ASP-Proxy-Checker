@@ -3,6 +3,9 @@ using System.ComponentModel.DataAnnotations;
 
 namespace ProxyChecker.Database.Models
 {
+    /// <summary>
+    /// Конфигурация настроек сайта
+    /// </summary>
     public class Config
     {
         [Key]
