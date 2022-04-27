@@ -21,6 +21,16 @@ namespace ProxyChecker.Controllers.API
         private const int _temporaryInformationResponse = 2;
 
         /// <summary>
+        /// Логгер компонента
+        /// </summary>
+        private readonly ILogger<FlareSolverrProxyController> _logger;
+
+        public FlareSolverrProxyController(ILogger<FlareSolverrProxyController> logger)
+        {
+            _logger = logger;
+        }
+
+        /// <summary>
         /// Добавляет текст в результаты вывода информации о процесса
         /// </summary>
         /// <param name="identifier">Идентификатор процесса</param>
@@ -28,9 +38,9 @@ namespace ProxyChecker.Controllers.API
         private void AddToLog(string identifier, string text)
         {
             if (_informationResponse.ContainsKey(identifier))
-                _informationResponse[identifier].Add(text);
+                _informationResponse[identifier].Add($"> {text}");
 
-            Console.WriteLine(text);
+            _logger.LogInformation(text);
         }
 
 
@@ -43,7 +53,10 @@ namespace ProxyChecker.Controllers.API
         public IActionResult AddProxyListInfo(string identifier)
         {
             if (!_informationResponse.ContainsKey(identifier))
+            {
+                _logger.LogWarning("Попытка получить запись по несуществующему идентификатору");
                 return StatusCode(404);
+            }
 
             return Ok(_informationResponse[identifier].ToArray());
         }
@@ -57,7 +70,11 @@ namespace ProxyChecker.Controllers.API
         public IActionResult AddProxyList(string data)
         {
             var backConnects = Newtonsoft.Json.JsonConvert.DeserializeObject<FlareSolverrProxyModel[]>(data);
-            if (backConnects == null) return StatusCode(400);
+            if (backConnects == null)
+            {
+                _logger.LogWarning("Не удалось преобразовать JSON от клиента в {0}", nameof(FlareSolverrProxyModel));
+                return StatusCode(400);
+            }
 
             DateTime temporaryDataDeletionTime = DateTime.UtcNow.AddMinutes(_temporaryInformationResponse);
             string identifier = Guid.NewGuid().ToString();
@@ -85,7 +102,7 @@ namespace ProxyChecker.Controllers.API
                     }
                     catch (Exception ex)
                     {
-                        Console.WriteLine(ex);
+                        _logger.LogError(ex.ToString());
                     }
                 });
             }
@@ -115,7 +132,7 @@ namespace ProxyChecker.Controllers.API
 
                 if (entry != null)
                 {
-                    AddToLog(identifier, $"> Прокси \"{authData}\" уже существует в базе данных.\n" +
+                    AddToLog(identifier, $"Прокси \"{authData}\" уже существует в базе данных.\n" +
                         $"ID: {entry.Id}\n");
 
                     return;
@@ -125,7 +142,7 @@ namespace ProxyChecker.Controllers.API
             var httpClientModel = await HttpClientProxyChecker.GetHttpClient(ip, port);
             if (httpClientModel == null)
             {
-                AddToLog(identifier, $"> Не удалось определить прокси для {authData}");
+                AddToLog(identifier, $"Не удалось определить прокси для {authData}");
                 return;
             }
 
@@ -152,13 +169,13 @@ namespace ProxyChecker.Controllers.API
                         db.SaveChanges();
                     }
 
-                    AddToLog(identifier, $"> В базу данных добавлен новый прокси: {proxyServerAddress}");
+                    AddToLog(identifier, $"В базу данных добавлен новый прокси: {proxyServerAddress}");
                 }
             }
             catch (Exception ex)
             {
-                Console.WriteLine(ex);
-                AddToLog(identifier, $"> Возникло исключение при определении {authData}");
+                _logger.LogError(ex.ToString());
+                AddToLog(identifier, $"Возникло исключение при определении {authData}");
             }
         }
     }

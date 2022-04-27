@@ -9,6 +9,8 @@ builder.Services.AddControllersWithViews();
 
 var app = builder.Build();
 
+ProxyChecker.Core.LogService.LoggerFactory = LoggerFactory.Create(loggingBuilder => loggingBuilder.AddConsole());
+
 // Configure the HTTP request pipeline.
 if (!app.Environment.IsDevelopment())
 {
@@ -21,7 +23,7 @@ else
     app.UseDeveloperExceptionPage();
 }
 
-app.UseHttpsRedirection();
+//app.UseHttpsRedirection();
 app.UseStaticFiles();
 
 app.UseRouting();

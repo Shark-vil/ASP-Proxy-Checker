@@ -20,10 +20,17 @@ namespace ProxyChecker.Core
         private static Queue<Proxy> _proxiesQueueUpdate = new Queue<Proxy>();
 
         /// <summary>
+        /// Логгер компонента
+        /// </summary>
+        private static ILogger<UpdateProxyChecker> _logger = LogService.LoggerFactory.CreateLogger<UpdateProxyChecker>();
+
+        /// <summary>
         /// Запустить сервис
         /// </summary>
         public static void Run()
         {
+            _logger.LogInformation("Вызов запуска фонового процесса отслеживания обновлений прокси");
+
             Task.Run(async () => await RunAsync());
         }
 
@@ -35,7 +42,7 @@ namespace ProxyChecker.Core
         {
             while (true)
             {
-                Console.WriteLine("Запуск проверки на обновление прокси");
+                _logger.LogInformation("Проверка на наличие обновлений прокси");
 
                 try
                 {
@@ -52,35 +59,35 @@ namespace ProxyChecker.Core
 
                                 if (proxyServerAddress != entry.RealAddress)
                                 {
-                                    Console.WriteLine("Один из прокси был изменён, начинаем проверку остальных");
+                                    _logger.LogInformation("Зафиксировано изменение: {0} -> {1}. Начинаю процесс обновления", entry.RealAddress, proxyServerAddress);
 
                                     _proxiesQueueUpdate = new Queue<Proxy>(db.Proxies);
 
                                     var multiThread = new MultiThread(UpdateEveryone);
                                     multiThread.Finish(() =>
                                     {
-                                        Console.WriteLine("Все прокси были обновлены");
+                                        _logger.LogInformation("Все прокси были обновлены");
                                     });
                                     multiThread.SetLimit(10);
                                     multiThread.Start();
                                 }
                                 else
                                 {
-                                    Console.WriteLine("Изменений не зафиксированно");
+                                    _logger.LogInformation("Изменений не зафиксированно");
                                 }
 
                                 break;
                             }
                             catch (Exception ex)
                             {
-                                Console.WriteLine(ex);
+                                _logger.LogError(ex.ToString());
                             }
                         }
                     }
                 }
                 catch (DataException ex)
                 {
-                    Console.WriteLine(ex);
+                    _logger.LogError(ex.ToString());
                 }
 
                 await Task.Delay(TimeSpan.FromMinutes(10));
@@ -117,7 +124,9 @@ namespace ProxyChecker.Core
                         {
                             lock (locker)
                             {
-                                Console.WriteLine($"Обновление прокси #{entry.Id}: {entry.RealAddress} --> {proxyServerAddress} ({httpClientModel.ProxyType})");
+                                uint tempId = entry.Id;
+                                string tempRealAddress = entry.RealAddress;
+
                                 entry.RealAddress = proxyServerAddress;
                                 entry.ProxyType = httpClientModel.ProxyType;
 
@@ -128,10 +137,12 @@ namespace ProxyChecker.Core
                                         db.Proxies.Update(entry);
                                         db.SaveChanges();
                                     }
+
+                                    _logger.LogInformation($"Обновление прокси #{tempId}: {tempRealAddress} --> {proxyServerAddress} ({httpClientModel.ProxyType})");
                                 }
                                 catch (DataException ex)
                                 {
-                                    Console.WriteLine(ex);
+                                    _logger.LogError(ex.ToString());
                                 }
                             }
                         }
@@ -139,7 +150,7 @@ namespace ProxyChecker.Core
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine(ex);
+                    _logger.LogError(ex.ToString());
                 }
             }
         }

@@ -81,6 +81,16 @@ namespace ProxyChecker.Controllers.API
         /// </summary>
         private static string _sessionName = "proxychecker";
 
+        /// <summary>
+        /// Логгер компонента
+        /// </summary>
+        private readonly ILogger<CheckProxyController> _logger;
+
+        public CheckProxyController(ILogger<CheckProxyController> logger)
+        {
+            _logger = logger;
+        }
+
 
         /// <summary>
         /// Останавливает активный в данный момент процесс сканирования
@@ -96,11 +106,14 @@ namespace ProxyChecker.Controllers.API
 
         private async Task StopProcess()
         {
+            _logger.LogInformation("Остановка процессов чекера");
+
             _flareSolverrProxies.Clear();
             _proxiesCheckedQueue.Clear();
             _currentCheckIdentifier = string.Empty;
 
-            await StopBrowsers();
+            if (CheckFlareSolverrUrl())
+                await StopBrowsers();
         }
 
         /// <summary>
@@ -113,7 +126,12 @@ namespace ProxyChecker.Controllers.API
         public IActionResult Start([FromForm] string checkType, [FromForm] uint threadCount)
         {
             if (string.IsNullOrEmpty(checkType) || (checkType != "api" && checkType != "proxy"))
+            {
+                _logger.LogWarning("Передан некорректный тип чекера: {0}", checkType);
                 return StatusCode(400);
+            }
+
+            _logger.LogInformation("Инициализация запуска чекера");
 
             _flareSolverrProxies.Clear();
             _proxiesCheckedQueue.Clear();
@@ -133,14 +151,21 @@ namespace ProxyChecker.Controllers.API
                 if (checkType == "api")
                 {
                     if (db.IPQualityScoreTokens.Count() == 0)
+                    {
+                        _logger.LogWarning("Нету доступных токенов для взаимодействия с API");
                         return StatusCode(500);
+                    }
                 }
             }
+
+            _logger.LogInformation("Подготовка к запуску мультипотока");
 
             MultiThread multiThread;
 
             Task.Run(async () =>
             {
+                _logger.LogInformation("Очистка таблицы \"IPQualityScoreChecks\" от результатов последнего сканирования");
+
                 using (var db = new DatabaseContext())
                 {
                     var ipQualityScoreChecksFromRemoves = new List<IPQualityScore>(db.IPQualityScoreChecks);
@@ -155,10 +180,17 @@ namespace ProxyChecker.Controllers.API
                     multiThread = new MultiThread(CheckByApi);
                 else
                 {
-                    multiThread = new MultiThread(CheckByParse);
+                    if (!CheckFlareSolverrUrl())
+                    {
+                        _logger.LogWarning("Адрес FlareSolverr: \"{0}\", не установлен или задан некорректно, процесс прерван!", _flareSolverrUrl);
+                        await StopProcess();
+                        return;
+                    }
 
                     await RebuildBrowsers();
                     await CloudFlareBypass();
+
+                    multiThread = new MultiThread(CheckByParse);
                 }
 
                 if (_proxiesCheckedQueue.Count > 0)
@@ -169,6 +201,25 @@ namespace ProxyChecker.Controllers.API
             });
 
             return Ok();
+        }
+
+        private bool CheckFlareSolverrUrl()
+        {
+            string webUrlPattern = @"^(ht|f)tp(s?)\:\/\/[0-9a-zA-Z]([-.\w]*[0-9a-zA-Z])*(:(0-9)*)*(\/?)([a-zA-Z0-9\-\.\?\,\'\/\\\+&%\$#_]*)?$";
+
+            using (var db = new DatabaseContext())
+            {
+                Config? config = db.Configuration.FirstOrDefault();
+                if (config != null)
+                    _flareSolverrUrl = config.FlareSolverrUrl;
+            }
+
+            if (string.IsNullOrEmpty(_flareSolverrUrl) || !Regex.IsMatch(_flareSolverrUrl, webUrlPattern))
+            {
+                return false;
+            }
+
+            return true;
         }
 
         /// <summary>
@@ -185,23 +236,9 @@ namespace ProxyChecker.Controllers.API
             var flareSolverrProxiesBlocked = new List<DbFlareSolverrProxy>();
             DbFlareSolverrProxy currentFlareSolverrProxy = null;
             Random randomTimeout = new Random();
-            string webUrlPattern = @"^(ht|f)tp(s?)\:\/\/[0-9a-zA-Z]([-.\w]*[0-9a-zA-Z])*(:(0-9)*)*(\/?)([a-zA-Z0-9\-\.\?\,\'\/\\\+&%\$#_]*)?$";
 
             using (var db = new DatabaseContext())
-            {
-                Console.WriteLine($"Число обходных прокси: {db.FlareSolverrProxies.Count()}");
-
-                Config? config = db.Configuration.FirstOrDefault();
-                if (config != null)
-                    _flareSolverrUrl = config.FlareSolverrUrl;
-            }
-
-            if (string.IsNullOrEmpty(_flareSolverrUrl) || !Regex.IsMatch(_flareSolverrUrl, webUrlPattern))
-            {
-                Console.WriteLine($"Адрес FlareSolverr не установлен или задан некорректно, процесс прерван!");
-                await StopProcess();
-                return;
-            }
+                _logger.LogInformation("Число обходных прокси: {0}", db.FlareSolverrProxies.Count());
 
             using (var httpClient = new HttpClient())
             {
@@ -211,7 +248,7 @@ namespace ProxyChecker.Controllers.API
                 {
                     try
                     {
-                        Console.WriteLine($"Попытка пробить CloudFlare");
+                        _logger.LogInformation("Попытка пробить CloudFlare");
 
                         Core.Models.FlareSolverr.FlareSolverrProxy flareSolverrProxy = null;
 
@@ -229,16 +266,18 @@ namespace ProxyChecker.Controllers.API
                                     url = $"{httpClientProxyModel.ProxyType}://{proxyIp}:{proxyPort}"
                                 };
 
-                                Console.WriteLine($"Определён прокси: {flareSolverrProxy.url}");
+                                _logger.LogInformation("Определён прокси: ", flareSolverrProxy.url);
                             }
                             else
                             {
-                                Console.WriteLine($"Прокси \"{proxyIp}:{proxyPort}\" не определён");
                                 flareSolverrProxiesBlocked.Add(currentFlareSolverrProxy);
+                                _logger.LogWarning("Прокси \"{0}:{1}\" не определён", proxyIp, proxyPort);
                             }
 
                             currentFlareSolverrProxy = null;
                         }
+
+                        _logger.LogInformation("Отправка запроса на: {0}", _flareSolverrUrl);
 
                         HttpResponseMessage httpResponse = await httpClient.SendAsync(new HttpRequestMessage
                         {
@@ -255,7 +294,9 @@ namespace ProxyChecker.Controllers.API
 
                         string jsonResponse = await httpResponse.Content.ReadAsStringAsync();
                         var flareSolverrResponse = JsonConvert.DeserializeObject<FlareSolverrResponseGet>(jsonResponse);
-                        
+
+                        _logger.LogInformation("Ответ от {0}:\n{1}", _flareSolverrUrl, jsonResponse);
+
                         if (
                             flareSolverrResponse != null &&
                             flareSolverrResponse.status != "error" &&
@@ -264,12 +305,10 @@ namespace ProxyChecker.Controllers.API
                             flareSolverrResponse.solution.status == 200
                         )
                         {
-                            Console.WriteLine("CloudFlare успешно пробит");
+                            _logger.LogInformation("CloudFlare успешно пробит");
                             isBypass = true;
                             break;
                         }
-
-                        Console.WriteLine($"Сервер вернул сообщение:\n{jsonResponse}");
 
                         if (flareSolverrResponse != null && flareSolverrResponse.solution != null)
                         {
@@ -281,8 +320,9 @@ namespace ProxyChecker.Controllers.API
                             {
                                 currentFlareSolverrProxy = flareSolverrProxies.Dequeue();
 
-                                Console.WriteLine($"Попытка подключится через прокси: " +
-                                    $"{currentFlareSolverrProxy.Ip}:{currentFlareSolverrProxy.Port}");
+                                _logger.LogInformation("Попытка подключится через прокси: {0}:{1}",
+                                    currentFlareSolverrProxy.Ip,
+                                    currentFlareSolverrProxy.Port);
                             }
                             else
                             {
@@ -295,7 +335,7 @@ namespace ProxyChecker.Controllers.API
                     }
                     catch (Exception ex)
                     {
-                        Console.WriteLine(ex);
+                        _logger.LogError(ex.ToString());
                     }
 
                     //await Task.Delay(6000);
@@ -309,6 +349,8 @@ namespace ProxyChecker.Controllers.API
         /// <returns>Task</returns>
         private async Task StopBrowsers()
         {
+            _logger.LogInformation("Подготовка к остановке браузера");
+
             using (var httpClient = new HttpClient())
             {
                 try
@@ -324,10 +366,12 @@ namespace ProxyChecker.Controllers.API
                             session = _sessionName
                         }), Encoding.UTF8, "application/json")
                     });
+
+                    _logger.LogInformation("Браузер остановлен");
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine(ex);
+                    _logger.LogError(ex.ToString());
                 }
             }
         }
@@ -338,6 +382,8 @@ namespace ProxyChecker.Controllers.API
         /// <returns>Task</returns>
         private async Task StartBrowsers()
         {
+            _logger.LogInformation("Подготовка к запуску браузера");
+
             using (var httpClient = new HttpClient())
             {
                 try
@@ -353,10 +399,12 @@ namespace ProxyChecker.Controllers.API
                             session = _sessionName
                         }), Encoding.UTF8, "application/json")
                     });
+
+                    _logger.LogInformation("Браузер запущен");
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine(ex);
+                    _logger.LogError(ex.ToString());
                 }
             }
         }
@@ -367,6 +415,8 @@ namespace ProxyChecker.Controllers.API
         /// <returns>Task</returns>
         private async Task RebuildBrowsers()
         {
+            _logger.LogInformation("Перезапуск браузера");
+
             await StopBrowsers();
             await StartBrowsers();
         }
@@ -403,7 +453,7 @@ namespace ProxyChecker.Controllers.API
                     HttpResponseMessage httpResponse = null;
                     string jsonResponse = null;
 
-                    Console.WriteLine($"Получаю информацию о:\n{normalUrl}");
+                    _logger.LogInformation("Получаю информацию по адресу:\n{0}", normalUrl);
 
                     using (var httpClient = new HttpClient())
                     {
@@ -425,11 +475,11 @@ namespace ProxyChecker.Controllers.API
                                     url = $"{httpClientProxyModel.ProxyType}://{proxyIp}:{proxyPort}"
                                 };
 
-                                Console.WriteLine($"Определён прокси: {flareSolverrProxy.url}");
+                                _logger.LogInformation("Определён прокси: {0}", flareSolverrProxy.url);
                             }
                             else
                             {
-                                Console.WriteLine($"Прокси \"{proxyIp}:{proxyPort}\" не определён");
+                                _logger.LogWarning("Прокси {0}:{1} не определён", proxyIp, proxyPort);
                             }
                         }
 
@@ -544,7 +594,7 @@ namespace ProxyChecker.Controllers.API
                                 iPQuality.Latitude = longitude;
                         }
 
-                        Console.WriteLine($"Fraud Score ({proxy.RealAddress}): {iPQuality.FraudScore}");
+                        _logger.LogInformation("[ {0} ] Fraud Score: {1}", proxy.RealAddress, iPQuality.FraudScore);
 
                         if (iPQuality.FraudScore == null || (uint)iPQuality.FraudScore != 0)
                             continue;
@@ -557,20 +607,23 @@ namespace ProxyChecker.Controllers.API
                             await db.IPQualityScoreChecks.AddAsync(iPQuality);
                             await db.SaveChangesAsync();
                         }
+
+                        _logger.LogInformation("Прокси \"[{0}] - {1}\" добавлен в список результатов", proxy.Id, iPQuality.Ip);
                     }
                 }
                 catch (MaxLookupsException ex) when (_flareSolverrProxies.Count > 0)
                 {
-                    Console.WriteLine(ex);
+                    _logger.LogError(ex.ToString());
                     backProxyToQueue = true;
                     _currentFlareSolverrProxy = _flareSolverrProxies.Dequeue();
 
-                    Console.WriteLine($"Попытка подключится через прокси: " +
-                        $"{_currentFlareSolverrProxy.Ip}:{_currentFlareSolverrProxy.Port}");
+                    _logger.LogInformation("Попытка подключится через прокси: {0}:{1}",
+                        _currentFlareSolverrProxy.Ip,
+                        _currentFlareSolverrProxy.Port);
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine(ex);
+                    _logger.LogError(ex.ToString());
                     backProxyToQueue = true;
                     await Task.Delay(6000);
                 }
@@ -580,7 +633,7 @@ namespace ProxyChecker.Controllers.API
                     lock (locker)
                     {
                         _proxiesCheckedQueue.Enqueue(proxy);
-                        Console.WriteLine("Прокси был добавлен обратно в очередь");
+                        _logger.LogInformation("Прокси \"[{0}] - {1}\" был добавлен обратно в очередь", proxy.Id, proxy.RealAddress);
                     }
                 }
             }
@@ -628,7 +681,7 @@ namespace ProxyChecker.Controllers.API
                     Uri webUrl = GetApiCheckerLink(proxy.RealAddress, currentApiToken);
                     string jsonData = string.Empty;
 
-                    Console.WriteLine($"Получаю информацию о:\n{webUrl.AbsoluteUri}");
+                    _logger.LogInformation("Получаю информацию по адресу:\n{0}", webUrl.AbsoluteUri);
 
                     using (var httpClient = new HttpClient())
                     {
@@ -645,7 +698,7 @@ namespace ProxyChecker.Controllers.API
                     if (!success)
                         throw new Exception(iPQuality.Message != null ? iPQuality.Message : "API отклонил запрос");
 
-                    Console.WriteLine($"Fraud Score ({proxy.RealAddress}): {iPQuality.FraudScore}");
+                    _logger.LogInformation("[ {0} ] Fraud Score: {1}", proxy.RealAddress, iPQuality.FraudScore);
 
                     if (iPQuality.FraudScore == null || (uint)iPQuality.FraudScore != 0)
                         continue;
@@ -658,27 +711,33 @@ namespace ProxyChecker.Controllers.API
                         await db.IPQualityScoreChecks.AddAsync(iPQuality);
                         await db.SaveChangesAsync();
                     }
+
+                    _logger.LogInformation("Прокси \"[{0}] - {1}\" добавлен в список результатов", proxy.Id, iPQuality.Ip);
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine(ex);
+                    _logger.LogError(ex.ToString());
 
                     lock (locker)
                     {
                         if (apiTokens.Count != 0)
                         {
                             _proxiesCheckedQueue.Enqueue(proxy);
-                            Console.WriteLine("Прокси был добавлен обратно в очередь");
+                            _logger.LogInformation("Прокси \"[{0}] - {1}\" был добавлен обратно в очередь", proxy.Id, proxy.RealAddress);
 
                             currentApiToken = apiTokens.Dequeue().Token;
-                            Console.WriteLine($"Попытка обновить токен на новый: {currentApiToken}");
+                            _logger.LogInformation("Попытка обновить токен на новый: {0}", currentApiToken);
                         }
                     }
                 }
             }
 
             if (threadIndex == 0)
+            {
                 await StopBrowsers();
+            }
+
+            _logger.LogInformation("Поток #{0} завершил работу", threadIndex);
         }
 
         /// <summary>

@@ -51,9 +51,9 @@
         private Func<object, int, Task>? _mainFunctionAsync;
 
         /// <summary>
-        /// Включает или отключает логи
+        /// Логгер компонента
         /// </summary>
-        private bool _consoleLog;
+        private readonly ILogger<MultiThread> _logger;
 
         /// <summary>
         /// Конструктор мультипотока.
@@ -63,6 +63,7 @@
         {
             _processName = Guid.NewGuid().ToString();
             _mainFunction = func;
+            _logger = LogService.LoggerFactory.CreateLogger<MultiThread>();
         }
 
         /// <summary>
@@ -74,6 +75,7 @@
         {
             _processName = processName == null ? Guid.NewGuid().ToString() : processName;
             _mainFunction = func;
+            _logger = LogService.LoggerFactory.CreateLogger<MultiThread>();
         }
 
         /// <summary>
@@ -84,6 +86,7 @@
         {
             _processName = Guid.NewGuid().ToString();
             _mainFunctionAsync = func;
+            _logger = LogService.LoggerFactory.CreateLogger<MultiThread>();
         }
 
         /// <summary>
@@ -95,6 +98,7 @@
         {
             _processName = processName == null ? Guid.NewGuid().ToString() : processName;
             _mainFunctionAsync = func;
+            _logger = LogService.LoggerFactory.CreateLogger<MultiThread>();
         }
 
         /// <summary>
@@ -115,15 +119,6 @@
         public static bool ExistsProcess(string processName)
         {
             return _threadsPool.ContainsKey(processName);
-        }
-
-        /// <summary>
-        /// Включает или отключает вывод логов в консоль сервера при выполнении мультипотока.
-        /// </summary>
-        /// <param name="enable">True - включить логи, False - выключить</param>
-        public void SetConsoleLog(bool enable)
-        {
-            _consoleLog = enable;
         }
 
         /// <summary>
@@ -158,6 +153,8 @@
         /// </summary>
         public void Start()
         {
+            _logger.LogInformation("Запуск мультипотока: {0}", _processName);
+
             if (_threadsPool.ContainsKey(_processName))
                 _threadsPool[_processName].Stop();
 
@@ -169,12 +166,10 @@
             }
             catch (Exception ex)
             {
-                ConsoleLog($"[Error][MultiThreads][InitAction]: {ex}");
+                _logger.LogError(ex.ToString());
             }
 
             Task.Run(RunProcess);
-
-            ConsoleLog($"[MultiThreads] Run - {_processName}");
         }
 
         /// <summary>
@@ -182,6 +177,8 @@
         /// </summary>
         public void Stop()
         {
+            _logger.LogInformation("Остановка мультипотока: {0}", _processName);
+
             if (_threadsPool.ContainsKey(_processName))
                 _threadsPool.Remove(_processName);
 
@@ -194,8 +191,6 @@
                         thread?.Interrupt();
                 }
             }
-
-            ConsoleLog($"[MultiThreads] Stop - {_processName}");
         }
 
         /// <summary>
@@ -204,6 +199,8 @@
         /// <returns>Task</returns>
         private async Task RunProcess()
         {
+            _logger.LogInformation("Инициализация компонентов мультипотока: {0}", _processName);
+
             for (int i = 0; i < _threadsLimit; i++)
             {
                 var thread = new Thread(() => ThreadProcess(i));
@@ -216,7 +213,7 @@
             {
                 Thread thread = _threads[i];
                 thread.Start();
-                ConsoleLog($"[MultiThreads][RunProcess] Start new thread: {i}");
+                _logger.LogInformation("Мультипоток \"{0}\" запустил поток \"{1}\"", _processName, i);
             }
 
             do
@@ -227,7 +224,7 @@
                     if (thread == null || !thread.IsAlive)
                     {
                         _threads.RemoveAt(i);
-                        ConsoleLog($"[MultiThreads][RunProcess] Removing dead thread: {i}");
+                        _logger.LogInformation("Мультипоток \"{0}\" остановил мёртвый поток \"{1}\"", _processName, i);
                     }
                 }
 
@@ -240,8 +237,10 @@
             }
             catch (Exception ex)
             {
-                ConsoleLog($"[Error][MultiThreads][FinishAction]: {ex}");
+                _logger.LogError(ex.ToString());
             }
+
+            _logger.LogInformation("Мультипоток \"{0}\" завершает работу", _processName);
 
             Stop();
         }
@@ -269,7 +268,7 @@
                         }
                         catch (Exception ex)
                         {
-                            Console.WriteLine(ex);
+                            _logger.LogError(ex.ToString());
                         }
 
                         isFinished = true;
@@ -283,18 +282,8 @@
             }
             catch (Exception ex)
             {
-                ConsoleLog($"[Error][MultiThreads][ThreadProcess]: {ex}");
+                _logger.LogError(ex.ToString());
             }
-        }
-
-        /// <summary>
-        /// Выводит текст в консоль сервера, если логи включены.
-        /// </summary>
-        /// <param name="str">Строка для вывода в консоль</param>
-        private void ConsoleLog(string str)
-        {
-            if (!_consoleLog) return;
-            Console.WriteLine(str);
         }
     }
 }

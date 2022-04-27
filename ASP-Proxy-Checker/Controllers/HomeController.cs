@@ -6,6 +6,9 @@ namespace ProxyChecker.Controllers
 {
     public class HomeController : Controller
     {
+        /// <summary>
+        /// Логгер компонента
+        /// </summary>
         private readonly ILogger<HomeController> _logger;
 
         public HomeController(ILogger<HomeController> logger)
