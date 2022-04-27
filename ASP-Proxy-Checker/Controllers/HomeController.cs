@@ -1,4 +1,4 @@
-﻿using ProxyChecker.Models;
+using ProxyChecker.Models;
 using Microsoft.AspNetCore.Mvc;
 using System.Diagnostics;
 

@@ -1,4 +1,4 @@
-﻿namespace ProxyChecker.Database.Models
+namespace ProxyChecker.Database.Models
 {
     /// <summary>
     /// Модель пользователя

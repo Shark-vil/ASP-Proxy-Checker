@@ -1,4 +1,4 @@
-﻿using ProxyChecker.Database;
+using ProxyChecker.Database;
 using ProxyChecker.Database.Models;
 using System.Data;
 

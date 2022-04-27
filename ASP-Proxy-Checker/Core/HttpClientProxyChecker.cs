@@ -1,4 +1,4 @@
-﻿using ProxyChecker.Core.Models;
+using ProxyChecker.Core.Models;
 using System.Net;
 
 namespace ProxyChecker.Core

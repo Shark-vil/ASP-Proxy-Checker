@@ -1,4 +1,4 @@
-﻿namespace ProxyChecker.Core.Models.FlareSolverr
+namespace ProxyChecker.Core.Models.FlareSolverr
 {
     /// <summary>
     /// Модель для обработки <see href="https://github.com/FlareSolverr/FlareSolverr">FlareSolverr</see>

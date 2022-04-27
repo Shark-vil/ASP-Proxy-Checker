@@ -1,4 +1,4 @@
-﻿namespace ProxyChecker.Core.Models
+namespace ProxyChecker.Core.Models
 {
     /// <summary>
     /// Модель используется в "BackConnectProxyController"

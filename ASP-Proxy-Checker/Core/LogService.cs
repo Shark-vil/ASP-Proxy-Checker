@@ -1,4 +1,4 @@
-﻿namespace ProxyChecker.Core
+namespace ProxyChecker.Core
 {
     public class LogService
     {

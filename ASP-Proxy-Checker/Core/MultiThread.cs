@@ -1,4 +1,4 @@
-﻿namespace ProxyChecker.Core
+namespace ProxyChecker.Core
 {
     /// <summary>
     /// Класс "MultiThread" способен запускать несколько одновременных потоков для выполенния одной задачи.

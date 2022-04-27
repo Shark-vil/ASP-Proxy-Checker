@@ -1,4 +1,4 @@
-﻿using HtmlAgilityPack;
+using HtmlAgilityPack;
 using Microsoft.AspNetCore.Mvc;
 using Newtonsoft.Json;
 using ProxyChecker.Core;

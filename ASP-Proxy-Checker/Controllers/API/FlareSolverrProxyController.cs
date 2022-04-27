@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc;
 using ProxyChecker.Core;
 using ProxyChecker.Core.Models;
 using ProxyChecker.Database;
