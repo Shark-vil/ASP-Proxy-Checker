@@ -231,11 +231,9 @@ namespace ProxyChecker.Controllers.API
         private async Task CloudFlareBypass()
         {
             bool isBypass = false;
-            uint timeLimit = 5000;
             var flareSolverrProxies = new Queue<DbFlareSolverrProxy>();
             var flareSolverrProxiesBlocked = new List<DbFlareSolverrProxy>();
             DbFlareSolverrProxy currentFlareSolverrProxy = null;
-            Random randomTimeout = new Random();
 
             using (var db = new DatabaseContext())
                 _logger.LogInformation("Число обходных прокси: {0}", db.FlareSolverrProxies.Count());
@@ -287,7 +285,6 @@ namespace ProxyChecker.Controllers.API
                             {
                                 url = "https://www.ipqualityscore.com/",
                                 session = _sessionName,
-                                maxTimeout = (uint)randomTimeout.Next(5000, (int)timeLimit),
                                 proxy = flareSolverrProxy
                             }), Encoding.UTF8, "application/json")
                         });
@@ -310,11 +307,7 @@ namespace ProxyChecker.Controllers.API
                             break;
                         }
 
-                        if (flareSolverrResponse != null && flareSolverrResponse.solution != null)
-                        {
-                            await Task.Delay(6000);
-                        }
-                        else
+                        if (flareSolverrResponse == null || flareSolverrResponse.solution == null)
                         {
                             if (flareSolverrProxies.Count > 0)
                             {
@@ -329,8 +322,6 @@ namespace ProxyChecker.Controllers.API
                                 using (var db = new DatabaseContext())
                                     flareSolverrProxies = new Queue<DbFlareSolverrProxy>(db.FlareSolverrProxies);
                             }
-
-                            timeLimit = Math.Clamp(timeLimit + 1000, 0, 60000);
                         }
                     }
                     catch (Exception ex)
@@ -338,7 +329,7 @@ namespace ProxyChecker.Controllers.API
                         _logger.LogError(ex.ToString());
                     }
 
-                    //await Task.Delay(6000);
+                    await Task.Delay(6000);
                 }
             }
         }
