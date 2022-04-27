@@ -28,6 +28,12 @@ namespace ProxyChecker.Core
         };
 
         /// <summary>
+        /// Логгер компонента
+        /// </summary>
+        private static ILogger<UpdateProxyChecker> _logger = LogService.LoggerFactory.CreateLogger<UpdateProxyChecker>();
+
+
+        /// <summary>
         /// Возвращает клиента с настроенными параметрами прокси для обмена. Если настройка не удалась, вернёт - NULL.
         /// </summary>
         /// <param name="ip">Адрес прокси</param>
@@ -47,10 +53,12 @@ namespace ProxyChecker.Core
                     httpClientModel.ProxyType = peoxyType;
                     return httpClientModel;
                 }
+
+                _logger.LogInformation("Не удалосьподключится или подобрать протокол для прокси \"{0}:{1}\"", ip, port);
             }
             catch (HttpRequestException ex)
             {
-                Console.WriteLine($"[GetHttpClient] {ex}");
+                _logger.LogError(ex.ToString());
             }
 
             return null;
@@ -74,6 +82,8 @@ namespace ProxyChecker.Core
 
                 try
                 {
+                    //_logger.LogInformation("Попытка обратится к прокси \"{0}:{1}\" по протоколу {2}", ip, port, proxyType);
+
                     using (resultHttpClient = new HttpClient(GetProxyHandler(proxyType, ip, port, username, password)))
                     {
                         //resultHttpClient.Timeout = _timeout;
@@ -83,7 +93,7 @@ namespace ProxyChecker.Core
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"[DetectProxyType][{proxyType.ToUpper()}] {ex}");
+                    _logger.LogError(ex.ToString());
                 }
             }
 

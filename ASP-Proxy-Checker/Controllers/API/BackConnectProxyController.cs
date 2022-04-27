@@ -25,9 +25,9 @@ namespace ProxyChecker.Controllers.API
         /// </summary>
         private readonly ILogger<BackConnectProxyController> _logger;
 
-        public BackConnectProxyController(ILogger<BackConnectProxyController> logger)
+        public BackConnectProxyController()
         {
-            _logger = logger;
+            _logger = LogService.LoggerFactory.CreateLogger<BackConnectProxyController>();
         }
 
         /// <summary>

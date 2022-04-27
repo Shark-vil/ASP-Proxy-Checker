@@ -25,9 +25,9 @@ namespace ProxyChecker.Controllers.API
         /// </summary>
         private readonly ILogger<FlareSolverrProxyController> _logger;
 
-        public FlareSolverrProxyController(ILogger<FlareSolverrProxyController> logger)
+        public FlareSolverrProxyController()
         {
-            _logger = logger;
+            _logger = LogService.LoggerFactory.CreateLogger<FlareSolverrProxyController>();
         }
 
         /// <summary>

@@ -1,6 +1,7 @@
 using ProxyChecker.Models;
 using Microsoft.AspNetCore.Mvc;
 using System.Diagnostics;
+using ProxyChecker.Core;
 
 namespace ProxyChecker.Controllers
 {
@@ -11,9 +12,9 @@ namespace ProxyChecker.Controllers
         /// </summary>
         private readonly ILogger<HomeController> _logger;
 
-        public HomeController(ILogger<HomeController> logger)
+        public HomeController()
         {
-            _logger = logger;
+            _logger = LogService.LoggerFactory.CreateLogger<HomeController>();
         }
 
         // GET: Home

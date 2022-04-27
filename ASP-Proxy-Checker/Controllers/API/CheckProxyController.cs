@@ -86,9 +86,9 @@ namespace ProxyChecker.Controllers.API
         /// </summary>
         private readonly ILogger<CheckProxyController> _logger;
 
-        public CheckProxyController(ILogger<CheckProxyController> logger)
+        public CheckProxyController()
         {
-            _logger = logger;
+            _logger = LogService.LoggerFactory.CreateLogger<CheckProxyController>();
         }
 
 
@@ -357,14 +357,20 @@ namespace ProxyChecker.Controllers.API
                 {
                     httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:90.0) Gecko/20100101 Firefox/90.0");
 
+                    _logger.LogInformation("Отправка запроса на: {0}", _flareSolverrUrl);
+
+                    var sendContent = new StringContent(JsonConvert.SerializeObject(new FlareSolverrRequestDestroy
+                    {
+                        session = _sessionName
+                    }), Encoding.UTF8, "application/json");
+
+                    _logger.LogInformation("Тело запроса: {0}", await sendContent.ReadAsStringAsync());
+
                     await httpClient.SendAsync(new HttpRequestMessage
                     {
                         RequestUri = new Uri(_flareSolverrUrl),
                         Method = new HttpMethod("POST"),
-                        Content = new StringContent(JsonConvert.SerializeObject(new FlareSolverrRequestDestroy
-                        {
-                            session = _sessionName
-                        }), Encoding.UTF8, "application/json")
+                        Content = sendContent
                     });
 
                     _logger.LogInformation("Браузер остановлен");
@@ -390,14 +396,20 @@ namespace ProxyChecker.Controllers.API
                 {
                     httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:90.0) Gecko/20100101 Firefox/90.0");
 
+                    _logger.LogInformation("Отправка запроса на: {0}", _flareSolverrUrl);
+
+                    var sendContent = new StringContent(JsonConvert.SerializeObject(new FlareSolverrRequestCreate
+                    {
+                        session = _sessionName
+                    }), Encoding.UTF8, "application/json");
+
+                    _logger.LogInformation("Тело запроса: {0}", await sendContent.ReadAsStringAsync());
+
                     await httpClient.SendAsync(new HttpRequestMessage
                     {
                         RequestUri = new Uri(_flareSolverrUrl),
                         Method = new HttpMethod("POST"),
-                        Content = new StringContent(JsonConvert.SerializeObject(new FlareSolverrRequestCreate
-                        {
-                            session = _sessionName
-                        }), Encoding.UTF8, "application/json")
+                        Content = sendContent
                     });
 
                     _logger.LogInformation("Браузер запущен");
