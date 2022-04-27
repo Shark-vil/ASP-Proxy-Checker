@@ -275,7 +275,7 @@ namespace ProxyChecker.Controllers.API
                             currentFlareSolverrProxy = null;
                         }
 
-                        _logger.LogInformation("Отправка запроса на: {0}", _flareSolverrUrl);
+                        //_logger.LogInformation("Отправка запроса на: {0}", _flareSolverrUrl);
 
                         HttpResponseMessage httpResponse = await httpClient.SendAsync(new HttpRequestMessage
                         {
@@ -292,7 +292,7 @@ namespace ProxyChecker.Controllers.API
                         string jsonResponse = await httpResponse.Content.ReadAsStringAsync();
                         var flareSolverrResponse = JsonConvert.DeserializeObject<FlareSolverrResponseGet>(jsonResponse);
 
-                        _logger.LogInformation("Ответ от {0}:\n{1}", _flareSolverrUrl, jsonResponse);
+                        //_logger.LogInformation("Ответ от {0}:\n{1}", _flareSolverrUrl, jsonResponse);
 
                         if (
                             flareSolverrResponse != null &&
@@ -306,6 +306,8 @@ namespace ProxyChecker.Controllers.API
                             isBypass = true;
                             break;
                         }
+
+                        _logger.LogInformation("CloudFlare не пробит. Ответ от {0}:\n{1}", _flareSolverrUrl, jsonResponse);
 
                         if (flareSolverrResponse == null || flareSolverrResponse.solution == null)
                         {
@@ -348,20 +350,14 @@ namespace ProxyChecker.Controllers.API
                 {
                     httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:90.0) Gecko/20100101 Firefox/90.0");
 
-                    _logger.LogInformation("Отправка запроса на: {0}", _flareSolverrUrl);
-
-                    var sendContent = new StringContent(JsonConvert.SerializeObject(new FlareSolverrRequestDestroy
-                    {
-                        session = _sessionName
-                    }), Encoding.UTF8, "application/json");
-
-                    _logger.LogInformation("Тело запроса: {0}", await sendContent.ReadAsStringAsync());
-
                     await httpClient.SendAsync(new HttpRequestMessage
                     {
                         RequestUri = new Uri(_flareSolverrUrl),
                         Method = new HttpMethod("POST"),
-                        Content = sendContent
+                        Content = new StringContent(JsonConvert.SerializeObject(new FlareSolverrRequestDestroy
+                        {
+                            session = _sessionName
+                        }), Encoding.UTF8, "application/json")
                     });
 
                     _logger.LogInformation("Браузер остановлен");
@@ -387,20 +383,14 @@ namespace ProxyChecker.Controllers.API
                 {
                     httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:90.0) Gecko/20100101 Firefox/90.0");
 
-                    _logger.LogInformation("Отправка запроса на: {0}", _flareSolverrUrl);
-
-                    var sendContent = new StringContent(JsonConvert.SerializeObject(new FlareSolverrRequestCreate
-                    {
-                        session = _sessionName
-                    }), Encoding.UTF8, "application/json");
-
-                    _logger.LogInformation("Тело запроса: {0}", await sendContent.ReadAsStringAsync());
-
                     await httpClient.SendAsync(new HttpRequestMessage
                     {
                         RequestUri = new Uri(_flareSolverrUrl),
                         Method = new HttpMethod("POST"),
-                        Content = sendContent
+                        Content = new StringContent(JsonConvert.SerializeObject(new FlareSolverrRequestCreate
+                        {
+                            session = _sessionName
+                        }), Encoding.UTF8, "application/json")
                     });
 
                     _logger.LogInformation("Браузер запущен");
